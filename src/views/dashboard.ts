@@ -7,7 +7,6 @@
 
 import { html } from '../utils/html';
 import { ASSET_VERSION } from '../utils/constants';
-import { LOGO_DATA_URI } from '../utils/logo';
 
 export function dashboardHtml(csrfToken: string, nonce: string): string {
   return `<!DOCTYPE html>
@@ -32,7 +31,7 @@ export function dashboardHtml(csrfToken: string, nonce: string): string {
 <body>
   <div id="app">
     <nav class="navbar">
-      <div class="nav-brand"><a href="https://digitalmeld.io/" target="_blank" rel="noopener"><img src="${LOGO_DATA_URI}" alt="Digital Meld" /></a></div>
+      <div class="nav-brand"><a href="https://digitalmeld.io/" target="_blank" rel="noopener"><img class="brand-logo brand-logo--on-light" src="/dashboard/static/brand/digital-meld-on-light.svg?v=${ASSET_VERSION}" alt="Digital Meld" /><img class="brand-logo brand-logo--on-dark" src="/dashboard/static/brand/digital-meld-on-dark.svg?v=${ASSET_VERSION}" alt="Digital Meld" /></a></div>
       <div class="nav-items">
         <select id="domain-selector" class="domain-selector">
           <option value="">Select Domain</option>

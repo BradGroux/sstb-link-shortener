@@ -6,7 +6,7 @@
  */
 
 import { html, raw } from '../utils/html';
-import { LOGO_DATA_URI } from '../utils/logo';
+import { ASSET_VERSION } from '../utils/constants';
 
 export const loginHtml = (csrfToken: string, nonce: string, setupAvailable: boolean) => html`<!DOCTYPE html>
 <html lang="en">
@@ -23,7 +23,7 @@ export const loginHtml = (csrfToken: string, nonce: string, setupAvailable: bool
     .login-container { background: white; padding: 2.5rem; border-radius: 16px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); width: 100%; max-width: 420px; }
     .login-brand { margin-bottom: 1.5rem; padding: 1rem 1.25rem; background: #0f172a; border-radius: 12px; }
     .login-brand a { display: flex; align-items: center; justify-content: center; }
-    .login-brand img { display: block; width: min(100%, 264px); height: auto; }
+    .login-brand img { display: block; width: min(100%, 220px); height: auto; }
     .form-group { margin-bottom: 1rem; }
     .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; color: #334155; font-size: 0.875rem; }
     .form-group input { width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 1rem; background: #f1f5f9; color: #334155; transition: all 0.2s; }
@@ -39,7 +39,7 @@ export const loginHtml = (csrfToken: string, nonce: string, setupAvailable: bool
 </head>
 <body>
   <div class="login-container">
-    <div class="login-brand"><a href="https://digitalmeld.io/" target="_blank" rel="noopener"><img src="${raw(LOGO_DATA_URI)}" alt="Digital Meld" /></a></div>
+    <div class="login-brand"><a href="https://digitalmeld.io/" target="_blank" rel="noopener"><img src="/dashboard/static/brand/digital-meld-on-dark.svg?v=${raw(ASSET_VERSION)}" alt="Digital Meld" /></a></div>
     <form id="login-form">
       <input type="hidden" id="csrf-token" name="_csrf" value="${csrfToken}">
       <div class="form-group">
