@@ -25,6 +25,7 @@ import { createUserSchema, updateUserSchema, setUserDomainsSchema, strongPasswor
 import { setUserDomains, getUserDomains, getAllUserDomains } from '../db/userDomains';
 import { getDomainById } from '../db/domains';
 import { logAuditEvent, getIpAddress, getUserAgent } from '../services/audit';
+import { requirePathParam } from '../utils/request';
 
 const usersRouter = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -85,7 +86,7 @@ usersRouter.get('/', authMiddleware, requireRole(['admin', 'owner']), async (c) 
 
 // Get user by ID (admin only)
 usersRouter.get('/:id', authMiddleware, requireRole(['admin', 'owner']), async (c) => {
-  const id = c.req.param('id');
+  const id = requirePathParam(c.req.param('id'), 'id');
   const user = await getUserById(c.env, id);
 
   if (!user) {
@@ -201,7 +202,7 @@ usersRouter.post('/', authMiddleware, requireRole(['admin', 'owner']), validateJ
 
 // Update user (admin only)
 usersRouter.put('/:id', authMiddleware, requireRole(['admin', 'owner']), validateJson(updateUserSchema), async (c) => {
-  const id = c.req.param('id');
+  const id = requirePathParam(c.req.param('id'), 'id');
   const validated = c.req.valid('json');
 
   const existingUser = await getUserById(c.env, id);
@@ -317,7 +318,7 @@ usersRouter.put('/:id', authMiddleware, requireRole(['admin', 'owner']), validat
 // Set user's domain access (admin only)
 usersRouter.put('/:id/domains', authMiddleware, requireRole(['admin', 'owner']), validateJson(setUserDomainsSchema), async (c) => {
   try {
-    const id = c.req.param('id');
+    const id = requirePathParam(c.req.param('id'), 'id');
     const validated = c.req.valid('json');
 
     const user = await getUserById(c.env, id);
@@ -398,7 +399,7 @@ usersRouter.put('/:id/domains', authMiddleware, requireRole(['admin', 'owner']),
 
 // Get user's accessible domains (admin only)
 usersRouter.get('/:id/domains', authMiddleware, requireRole(['admin', 'owner']), async (c) => {
-  const id = c.req.param('id');
+  const id = requirePathParam(c.req.param('id'), 'id');
   const user = await getUserById(c.env, id);
 
   if (!user) {
@@ -422,7 +423,7 @@ usersRouter.get('/:id/domains', authMiddleware, requireRole(['admin', 'owner']),
 // Delete user (admin only) - moved from auth.ts
 usersRouter.delete('/:id', authMiddleware, requireRole(['admin', 'owner']), async (c) => {
   const currentUser = c.get('user') as { id: string; role: string };
-  const targetUserId = c.req.param('id');
+  const targetUserId = requirePathParam(c.req.param('id'), 'id');
 
   // Cannot delete yourself
   if (currentUser.id === targetUserId) {
@@ -466,4 +467,3 @@ usersRouter.delete('/:id', authMiddleware, requireRole(['admin', 'owner']), asyn
 });
 
 export { usersRouter };
-

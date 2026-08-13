@@ -9,21 +9,22 @@
 
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import type { Env, User, Variables } from '../types';
+import type { ApiKeyContext, Env, User, Variables } from '../types';
 import { listTags, countTags, getTagById, createTag, updateTag, deleteTag } from '../db/tags';
 import { getDomainById } from '../db/domains';
-import { authMiddleware } from '../middleware/auth';
+import { authMiddleware, authOrApiKeyMiddleware } from '../middleware/auth';
 import { validateJson } from '../middleware/validate';
-import { requirePermission } from '../middleware/authorization';
+import { assertApiKeyDomainScope, requireApiKeyScope, requirePermission } from '../middleware/authorization';
 import { filterTagsByAccess, canAccessDomain } from '../utils/permissions';
 import { createTagSchema, updateTagSchema } from '../schemas';
+import { requirePathParam } from '../utils/request';
 
 const tagsRouter = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // Schemas imported from ../schemas
 
 // List tags
-tagsRouter.get('/', authMiddleware, async (c) => {
+tagsRouter.get('/', authOrApiKeyMiddleware, requireApiKeyScope('taxonomy:read'), async (c) => {
   const domainId = c.req.query('domain_id');
   const limitParam = c.req.query('limit');
   const offsetParam = c.req.query('offset');
@@ -43,6 +44,11 @@ tagsRouter.get('/', authMiddleware, async (c) => {
   // Use cached accessible_domain_ids from context (already fetched in authMiddleware)
   const accessibleDomainIds = (user as any).accessible_domain_ids;
   tags = await filterTagsByAccess(c.env, tags, user, accessibleDomainIds);
+  const apiKey = c.get('apiKey') as ApiKeyContext | undefined;
+  if (domainId) assertApiKeyDomainScope(c, domainId);
+  if (apiKey?.domain_ids?.length) {
+    tags = tags.filter((tag) => !tag.domain_id || apiKey.domain_ids!.includes(tag.domain_id));
+  }
 
   // Apply pagination after filtering
   const totalCount = tags.length;
@@ -62,8 +68,8 @@ tagsRouter.get('/', authMiddleware, async (c) => {
 });
 
 // Get tag by ID
-tagsRouter.get('/:id', authMiddleware, async (c) => {
-  const id = c.req.param('id');
+tagsRouter.get('/:id', authOrApiKeyMiddleware, requireApiKeyScope('taxonomy:read'), async (c) => {
+  const id = requirePathParam(c.req.param('id'), 'id');
   const tag = await getTagById(c.env, id);
 
   if (!tag) {
@@ -72,6 +78,7 @@ tagsRouter.get('/:id', authMiddleware, async (c) => {
 
   // Check domain access if tag has a domain
   if (tag.domain_id) {
+    assertApiKeyDomainScope(c, tag.domain_id);
     const user = c.get('user') as User;
     const hasAccess = await canAccessDomain(c.env, user, tag.domain_id);
     if (!hasAccess) {
@@ -118,7 +125,7 @@ tagsRouter.post('/', authMiddleware, requirePermission('manage_tags'), validateJ
 // Update tag
 tagsRouter.put('/:id', authMiddleware, requirePermission('manage_tags'), validateJson(updateTagSchema), async (c) => {
   try {
-    const id = c.req.param('id');
+    const id = requirePathParam(c.req.param('id'), 'id');
     const validated = c.req.valid('json');
 
     const existingTag = await getTagById(c.env, id);
@@ -154,7 +161,7 @@ tagsRouter.put('/:id', authMiddleware, requirePermission('manage_tags'), validat
 
 // Delete tag
 tagsRouter.delete('/:id', authMiddleware, requirePermission('manage_tags'), async (c) => {
-  const id = c.req.param('id');
+  const id = requirePathParam(c.req.param('id'), 'id');
 
   const existingTag = await getTagById(c.env, id);
   if (!existingTag) {
@@ -176,4 +183,3 @@ tagsRouter.delete('/:id', authMiddleware, requirePermission('manage_tags'), asyn
 });
 
 export { tagsRouter };
-

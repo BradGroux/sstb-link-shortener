@@ -1,7 +1,13 @@
-name = "openshortlink"
+name = "sstb-link-shortener-production"
 main = "src/index.ts"
-compatibility_date = "2024-01-01"
+compatibility_date = "2026-08-13"
 compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
+
+[[routes]]
+pattern = "go.sstb.ai"
+custom_domain = true
 
 
 # D1 Database
@@ -10,8 +16,8 @@ compatibility_flags = ["nodejs_compat"]
 # This ID is not considered highly sensitive as it requires account access to use
 [[d1_databases]]
 binding = "DB"
-database_name = "openshortlink-db"
-database_id = ""  # Replace with your actual database ID
+database_name = "sstb-link-shortener-production"
+database_id = "2463a037-750f-4ca5-bb46-74c93c8b8209"
 
 
 # KV Namespace
@@ -19,14 +25,13 @@ database_id = ""  # Replace with your actual database ID
 # You must hardcode your actual KV namespace IDs here (get them from: wrangler kv:namespace list)
 [[kv_namespaces]]
 binding = "CACHE"
-id = ""  # Replace with your actual KV namespace ID
-preview_id = ""  # Replace with your actual KV preview ID
+id = "5cefbc3c54084baf87fad9fb66930e08"
 
 
 # Analytics Engine
 [[analytics_engine_datasets]]
 binding = "ANALYTICS"
-dataset = "openshortlink-analytics"
+dataset = "sstb-link-shortener-production"
 
 
 # Environment variables
@@ -35,12 +40,30 @@ ENVIRONMENT = "production"
 LOG_LEVEL = "info"
 CACHE_TTL = "604800"
 MAX_LINKS_PER_DOMAIN = "10000"
+CLOUDFLARE_ACCOUNT_ID = "323b20dd391cf458a421175f42155056"
+ANALYTICS_DATASET_NAME = "sstb-link-shortener-production"
 
-# Rate limiting configuration
-# For development/testing: use shorter windows (60 seconds)
-# For production: use longer windows (7200 seconds = 2 hours) for security
-FAILED_AUTH_LIMIT = "5"      # Max failed authentication attempts before blocking
-FAILED_AUTH_WINDOW = "7200"    # Time window in seconds (60 = 1 minute for dev/test)
+# Native, atomic Cloudflare rate-limit bindings. Namespace IDs are intentionally
+# unique so each authentication surface has an independent counter.
+[[ratelimits]]
+name = "LOGIN_RATE_LIMITER"
+namespace_id = "731001"
+simple = { limit = 5, period = 60 }
+
+[[ratelimits]]
+name = "REGISTER_RATE_LIMITER"
+namespace_id = "731002"
+simple = { limit = 3, period = 60 }
+
+[[ratelimits]]
+name = "REFRESH_RATE_LIMITER"
+namespace_id = "731003"
+simple = { limit = 10, period = 60 }
+
+[[ratelimits]]
+name = "API_AUTH_RATE_LIMITER"
+namespace_id = "731004"
+simple = { limit = 60, period = 60 }
 
 
 # Security & API Secrets:
@@ -50,7 +73,7 @@ FAILED_AUTH_WINDOW = "7200"    # Time window in seconds (60 = 1 minute for dev/t
 #
 # Required secrets:
 #   SETUP_TOKEN - Generated with: openssl rand -hex 32
-#   CLOUDFLARE_ACCOUNT_ID - Your Cloudflare account ID
+#   ANALYTICS_IP_HASH_SECRET - Generated with: openssl rand -hex 32
 #   CLOUDFLARE_API_TOKEN - API token with "Account Analytics Read" permission
 
 
@@ -79,4 +102,3 @@ head_sampling_rate = 1
 
 [placement]
 mode = "smart"
-

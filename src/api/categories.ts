@@ -9,21 +9,22 @@
 
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import type { Env, User, Variables } from '../types';
+import type { ApiKeyContext, Env, User, Variables } from '../types';
 import { listCategories, countCategories, getCategoryById, createCategory, updateCategory, deleteCategory } from '../db/categories';
 import { getDomainById } from '../db/domains';
-import { authMiddleware } from '../middleware/auth';
+import { authMiddleware, authOrApiKeyMiddleware } from '../middleware/auth';
 import { validateJson } from '../middleware/validate';
-import { requirePermission } from '../middleware/authorization';
+import { assertApiKeyDomainScope, requireApiKeyScope, requirePermission } from '../middleware/authorization';
 import { filterCategoriesByAccess, canAccessDomain } from '../utils/permissions';
 import { createCategorySchema, updateCategorySchema } from '../schemas';
+import { requirePathParam } from '../utils/request';
 
 const categoriesRouter = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // Schemas imported from ../schemas
 
 // List categories
-categoriesRouter.get('/', authMiddleware, async (c) => {
+categoriesRouter.get('/', authOrApiKeyMiddleware, requireApiKeyScope('taxonomy:read'), async (c) => {
   const domainId = c.req.query('domain_id');
   const limitParam = c.req.query('limit');
   const offsetParam = c.req.query('offset');
@@ -43,6 +44,11 @@ categoriesRouter.get('/', authMiddleware, async (c) => {
   // Use cached accessible_domain_ids from context (already fetched in authMiddleware)
   const accessibleDomainIds = (user as any).accessible_domain_ids;
   categories = await filterCategoriesByAccess(c.env, categories, user, accessibleDomainIds);
+  const apiKey = c.get('apiKey') as ApiKeyContext | undefined;
+  if (domainId) assertApiKeyDomainScope(c, domainId);
+  if (apiKey?.domain_ids?.length) {
+    categories = categories.filter((category) => !category.domain_id || apiKey.domain_ids!.includes(category.domain_id));
+  }
 
   // Apply pagination after filtering
   const totalCount = categories.length;
@@ -62,8 +68,8 @@ categoriesRouter.get('/', authMiddleware, async (c) => {
 });
 
 // Get category by ID
-categoriesRouter.get('/:id', authMiddleware, async (c) => {
-  const id = c.req.param('id');
+categoriesRouter.get('/:id', authOrApiKeyMiddleware, requireApiKeyScope('taxonomy:read'), async (c) => {
+  const id = requirePathParam(c.req.param('id'), 'id');
   const category = await getCategoryById(c.env, id);
 
   if (!category) {
@@ -72,6 +78,7 @@ categoriesRouter.get('/:id', authMiddleware, async (c) => {
 
   // Check domain access if category has a domain
   if (category.domain_id) {
+    assertApiKeyDomainScope(c, category.domain_id);
     const user = c.get('user') as User;
     const hasAccess = await canAccessDomain(c.env, user, category.domain_id);
     if (!hasAccess) {
@@ -118,7 +125,7 @@ categoriesRouter.post('/', authMiddleware, requirePermission('manage_categories'
 // Update category
 categoriesRouter.put('/:id', authMiddleware, requirePermission('manage_categories'), validateJson(updateCategorySchema), async (c) => {
   try {
-    const id = c.req.param('id');
+    const id = requirePathParam(c.req.param('id'), 'id');
     const validated = c.req.valid('json');
 
     const existingCategory = await getCategoryById(c.env, id);
@@ -154,7 +161,7 @@ categoriesRouter.put('/:id', authMiddleware, requirePermission('manage_categorie
 
 // Delete category
 categoriesRouter.delete('/:id', authMiddleware, requirePermission('manage_categories'), async (c) => {
-  const id = c.req.param('id');
+  const id = requirePathParam(c.req.param('id'), 'id');
 
   const existingCategory = await getCategoryById(c.env, id);
   if (!existingCategory) {
@@ -176,4 +183,3 @@ categoriesRouter.delete('/:id', authMiddleware, requirePermission('manage_catego
 });
 
 export { categoriesRouter };
-

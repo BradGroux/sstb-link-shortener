@@ -19,6 +19,8 @@ import { handleRedirect } from './services/redirect';
 import { getDomainByRoutingPath } from './db/domains';
 import { getRootPageSettingsOrDefault } from './db/settings';
 import { escapeHtml } from './utils/html';
+import { openApiDocument } from './openapi';
+import { hasBearerAuthorization, isCsrfExemptAuthPath } from './utils/authRoute';
 
 // Import API routes (static - they're small and needed for functionality)
 import { linksRouter } from './api/links';
@@ -54,19 +56,18 @@ app.use('*', async (c, next) => {
   const isAdminRoute = path.startsWith('/dashboard') || path.startsWith('/api');
   
   // Exclude auth endpoints from CSRF (they create sessions, can't have CSRF token before login)
-  const isAuthEndpoint = path === '/api/auth/login' || 
-                         path === '/api/auth/register' ||
-                         path === '/api/auth/refresh' ||
-                         path === '/api/auth/mfa/verify';
+  const isAuthEndpoint = isCsrfExemptAuthPath(path);
+  const isBearerApiRequest = path.startsWith('/api/') && hasBearerAuthorization(c.req.header('Authorization'));
   
-  if (isAdminRoute && !isAuthEndpoint) {
+  if (isAdminRoute && !isAuthEndpoint && !isBearerApiRequest) {
     // Apply CSRF and security headers for dashboard/API routes
     // Chain them properly: CSRF first, then security headers
     await csrfProtection(c, async () => {
       await securityHeaders(c, next);
     });
-  } else if (isAdminRoute && isAuthEndpoint) {
-    // Auth endpoints: security headers only, no CSRF
+  } else if (isAdminRoute && (isAuthEndpoint || isBearerApiRequest)) {
+    // Auth endpoints and explicit bearer API requests: security headers only.
+    // Bearer credentials are not ambient browser credentials, so CSRF does not apply.
     await securityHeaders(c, next);
   } else {
     // Public routes (redirects + the root/route landing page, which can now return
@@ -225,51 +226,6 @@ app.route('/dashboard/api/v1/categories', categoriesRouter);
 app.route('/dashboard/api/v1/api-keys', apiKeysRouter);
 app.route('/dashboard/api/v1/settings', settingsRouter);
 
-// Auto-create first user - also available under /dashboard/api
-app.post('/dashboard/api/v1/auth/setup-auto', async (c) => {
-  const existingUsers = await c.env.DB.prepare('SELECT COUNT(*) as count FROM users').first<{ count: number }>();
-  const userCount = existingUsers?.count || 0;
-
-  if (userCount > 0) {
-    return c.json({ success: false, message: 'Users already exist. Auto-setup is only for first user.' }, 400);
-  }
-
-  if (!c.env.FIRST_USER_USERNAME || !c.env.FIRST_USER_PASSWORD) {
-    return c.json({
-      success: false,
-      message: 'Auto-setup requires FIRST_USER_USERNAME and FIRST_USER_PASSWORD environment variables.'
-    }, 400);
-  }
-
-  const { getUserByUsername } = await import('./db/users');
-  const existingUser = await getUserByUsername(c.env, c.env.FIRST_USER_USERNAME);
-  if (existingUser) {
-    return c.json({ success: false, message: 'User already exists.' }, 400);
-  }
-
-  const { hashPassword } = await import('./utils/crypto');
-  const { createUser } = await import('./db/users');
-  const passwordHash = await hashPassword(c.env.FIRST_USER_PASSWORD);
-
-  const user = await createUser(c.env, {
-    username: c.env.FIRST_USER_USERNAME,
-    email: c.env.FIRST_USER_EMAIL || undefined,
-    password_hash: passwordHash,
-    role: 'owner',
-  });
-
-  return c.json({
-    success: true,
-    message: 'First user created successfully from environment variables.',
-    data: {
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      role: user.role,
-    },
-  }, 201);
-});
-
 // Dashboard catch-all - AFTER API routes
 app.get('/dashboard/*', async (c) => {
   return c.redirect('/dashboard');
@@ -278,51 +234,6 @@ app.get('/dashboard/*', async (c) => {
 // ============================================================================
 // EXTERNAL API ROUTES - Optional, enable /api/* route in Cloudflare if needed
 // ============================================================================
-
-// External API - for third-party integrations (requires /api/* Cloudflare route)
-app.post('/api/v1/auth/setup-auto', async (c) => {
-  const existingUsers = await c.env.DB.prepare('SELECT COUNT(*) as count FROM users').first<{ count: number }>();
-  const userCount = existingUsers?.count || 0;
-
-  if (userCount > 0) {
-    return c.json({ success: false, message: 'Users already exist. Auto-setup is only for first user.' }, 400);
-  }
-
-  if (!c.env.FIRST_USER_USERNAME || !c.env.FIRST_USER_PASSWORD) {
-    return c.json({
-      success: false,
-      message: 'Auto-setup requires FIRST_USER_USERNAME and FIRST_USER_PASSWORD environment variables.'
-    }, 400);
-  }
-
-  const { getUserByUsername } = await import('./db/users');
-  const existingUser = await getUserByUsername(c.env, c.env.FIRST_USER_USERNAME);
-  if (existingUser) {
-    return c.json({ success: false, message: 'User already exists.' }, 400);
-  }
-
-  const { hashPassword } = await import('./utils/crypto');
-  const { createUser } = await import('./db/users');
-  const passwordHash = await hashPassword(c.env.FIRST_USER_PASSWORD);
-
-  const user = await createUser(c.env, {
-    username: c.env.FIRST_USER_USERNAME,
-    email: c.env.FIRST_USER_EMAIL || undefined,
-    password_hash: passwordHash,
-    role: 'owner',
-  });
-
-  return c.json({
-    success: true,
-    message: 'First user created successfully from environment variables.',
-    data: {
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      role: user.role,
-    },
-  }, 201);
-});
 
 app.route('/api/v1/auth', authRouter);
 app.route('/api/v1/users', usersRouter);
@@ -334,6 +245,10 @@ app.route('/api/v1/tags', tagsRouter);
 app.route('/api/v1/categories', categoriesRouter);
 app.route('/api/v1/api-keys', apiKeysRouter);
 app.route('/api/v1/settings', settingsRouter);
+
+// Public, machine-readable contract for agent integrations.
+app.get('/openapi.json', (c) => c.json(openApiDocument));
+app.get('/api/openapi.json', (c) => c.json(openApiDocument));
 
 // ============================================================================
 // LINK REDIRECT HANDLER - Catch-all for short link redirects

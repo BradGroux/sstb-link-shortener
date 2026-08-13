@@ -9,6 +9,9 @@
 // Phase 4: Schema Composition & Type Inference
 
 import { z } from 'zod';
+import { API_KEY_SCOPES, DEFAULT_AGENT_SCOPES } from '../utils/apiScopes';
+
+const apiKeyScopeSchema = z.enum(API_KEY_SCOPES);
 
 // ============================================================================
 // Validation Patterns
@@ -44,11 +47,12 @@ const lenientExpiresAtSchema = z.union([
 
 export const createApiKeySchema = z.object({
   name: z.string().min(1).max(255),
-  domain_ids: z.array(z.string()).optional(),
+  domain_ids: z.array(z.string()).min(1, 'At least one domain is required'),
   ip_whitelist: z.array(ipAddressSchema).optional(),
   allow_all_ips: z.boolean().optional().default(false),
   expires_at: lenientExpiresAtSchema,
   user_id: z.string().optional(),
+  scopes: z.array(apiKeyScopeSchema).min(1).default(DEFAULT_AGENT_SCOPES),
 });
 
 export const updateApiKeySchema = z.object({
@@ -57,6 +61,7 @@ export const updateApiKeySchema = z.object({
   ip_whitelist: z.array(ipAddressSchema).optional(),
   allow_all_ips: z.boolean().optional(),
   expires_at: lenientExpiresAtSchema,
+  scopes: z.array(apiKeyScopeSchema).min(1).optional(),
 });
 
 // ============================================================================

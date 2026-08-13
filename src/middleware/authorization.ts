@@ -9,10 +9,39 @@
 
 import type { Context, Next } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import type { Env, User, Variables } from '../types';
+import type { ApiKeyContext, Env, User, Variables } from '../types';
 import { hasPermission, canAccessDomain, canAccessLink, canAccessDomainAction } from '../utils/permissions';
 import { getLinkById } from '../db/links';
 import { getDomainById } from '../db/domains';
+import type { ApiKeyScope } from '../utils/apiScopes';
+import { hasApiKeyScope } from '../utils/apiScopes';
+
+export function assertApiKeyScope(
+  c: Context<{ Bindings: Env; Variables: Variables }>,
+  scope: ApiKeyScope
+): void {
+  const apiKey = c.get('apiKey') as ApiKeyContext | undefined;
+  if (apiKey && !hasApiKeyScope(apiKey.scopes, scope)) {
+    throw new HTTPException(403, { message: `API key scope required: ${scope}` });
+  }
+}
+
+export function requireApiKeyScope(scope: ApiKeyScope) {
+  return async (c: Context<{ Bindings: Env; Variables: Variables }>, next: Next) => {
+    assertApiKeyScope(c, scope);
+    await next();
+  };
+}
+
+export function assertApiKeyDomainScope(
+  c: Context<{ Bindings: Env; Variables: Variables }>,
+  domainId: string
+): void {
+  const apiKey = c.get('apiKey') as ApiKeyContext | undefined;
+  if (apiKey?.domain_ids?.length && !apiKey.domain_ids.includes(domainId)) {
+    throw new HTTPException(403, { message: 'Domain not on API key scope' });
+  }
+}
 
 /**
  * Require user to have one of the specified roles
@@ -189,4 +218,3 @@ export function requireDomainAccessFromParam(action: 'view' | 'edit' | 'delete' 
     await next();
   };
 }
-

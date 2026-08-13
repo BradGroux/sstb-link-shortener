@@ -228,6 +228,10 @@ export interface Env {
   DB: D1Database;
   CACHE: KVNamespace;
   ANALYTICS: AnalyticsEngineDataset;
+  LOGIN_RATE_LIMITER: RateLimit;
+  REGISTER_RATE_LIMITER: RateLimit;
+  REFRESH_RATE_LIMITER: RateLimit;
+  API_AUTH_RATE_LIMITER: RateLimit;
   CLOUDFLARE_ACCOUNT_ID?: string;
   CLOUDFLARE_API_TOKEN?: string;
   ACCESS_AUDIENCE_TAG?: string;
@@ -238,9 +242,7 @@ export interface Env {
   MAX_LINKS_PER_DOMAIN?: string;
   // First user setup (secure)
   SETUP_TOKEN?: string; // Required token to create first user
-  FIRST_USER_USERNAME?: string; // Optional: auto-create first user from env
-  FIRST_USER_EMAIL?: string; // Optional: auto-create first user from env
-  FIRST_USER_PASSWORD?: string; // Optional: auto-create first user from env
+  ANALYTICS_IP_HASH_SECRET?: string; // HMAC secret for daily-rotating visitor identifiers
   // Analytics configuration
   ANALYTICS_DATASET_NAME?: string; // Analytics Engine dataset name (default: "link-clicks")
   ANALYTICS_ENGINE_THRESHOLD_DAYS?: string; // Days threshold for using Analytics Engine (default: "89")
@@ -250,9 +252,6 @@ export interface Env {
   RATE_LIMIT_API_KEY?: string; // Default: 100 requests/minute
   RATE_LIMIT_USER?: string; // Default: 100 requests/minute
   RATE_LIMIT_IP?: string; // Default: 20 requests/minute
-  // Auth rate limiting (optional - for brute-force protection)
-  FAILED_AUTH_LIMIT?: string; // Default: 5 attempts
-  FAILED_AUTH_WINDOW?: string; // Default: 7200 seconds (2 hours)
 }
 
 // Extended user type for context (includes cached domain access)
@@ -309,6 +308,7 @@ export interface ApiKey {
   created_at: number;
   updated_at: number;
   status: 'active' | 'revoked' | 'expired';
+  scopes: string; // JSON array of operation scopes
   // Virtual fields (not in DB, computed at runtime)
   domain_ids?: string[];
   domains?: Domain[];
@@ -320,6 +320,7 @@ export interface ApiKeyCreateRequest {
   ip_whitelist?: string[]; // Array of IP addresses (empty array = all IPs)
   allow_all_ips?: boolean; // If true, ignores ip_whitelist
   expires_at?: number | null; // Unix timestamp (null = never expires, undefined = not provided)
+  scopes: import('../utils/apiScopes').ApiKeyScope[];
 }
 
 export interface ApiKeyResponse {
@@ -333,6 +334,7 @@ export interface ApiKeyResponse {
   last_used_at?: number;
   created_at: number;
   status: 'active' | 'revoked' | 'expired';
+  scopes: import('../utils/apiScopes').ApiKeyScope[];
   domains?: Domain[];
   // Only returned on creation:
   api_key?: string; // Full key shown ONLY once on creation
@@ -344,6 +346,7 @@ export interface ApiKeyContext {
   domain_ids?: string[];
   allow_all_ips: boolean;
   ip_whitelist?: string[];
+  scopes: import('../utils/apiScopes').ApiKeyScope[];
 }
 
 // Status Check Types

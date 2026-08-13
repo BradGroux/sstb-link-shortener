@@ -9,7 +9,7 @@
 
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import type { Env, User } from '../types';
+import type { ApiKeyContext, Env, User, Variables } from '../types';
 import {
   getDomainById,
   getDomainByName,
@@ -18,18 +18,24 @@ import {
   listDomains,
   buildDomainSettings,
 } from '../db/domains';
-import { authMiddleware } from '../middleware/auth';
+import { authMiddleware, authOrApiKeyMiddleware } from '../middleware/auth';
 import { validateJson } from '../middleware/validate';
-import { requireRole, requireDomainAccessFromParam } from '../middleware/authorization';
+import {
+  assertApiKeyDomainScope,
+  requireApiKeyScope,
+  requireRole,
+  requireDomainAccessFromParam,
+} from '../middleware/authorization';
 import { filterDomainsByAccess } from '../utils/permissions';
 import { createDomainSchema, updateDomainSchema } from '../schemas';
+import { requirePathParam } from '../utils/request';
 
-const domainsRouter = new Hono<{ Bindings: Env }>();
+const domainsRouter = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // Schemas imported from ../schemas
 
 // List domains
-domainsRouter.get('/', authMiddleware, async (c) => {
+domainsRouter.get('/', authOrApiKeyMiddleware, requireApiKeyScope('domains:read'), async (c) => {
   const accountId = c.req.query('account_id');
   const domains = await listDomains(c.env, accountId || undefined);
 
@@ -37,14 +43,19 @@ domainsRouter.get('/', authMiddleware, async (c) => {
   const user = (c as any).get('user') as User;
   // Use cached accessible_domain_ids from context (already fetched in authMiddleware)
   const accessibleDomainIds = (user as any).accessible_domain_ids;
-  const filteredDomains = await filterDomainsByAccess(c.env, domains, user, accessibleDomainIds);
+  let filteredDomains = await filterDomainsByAccess(c.env, domains, user, accessibleDomainIds);
+  const apiKey = c.get('apiKey') as ApiKeyContext | undefined;
+  if (apiKey?.domain_ids?.length) {
+    filteredDomains = filteredDomains.filter((domain) => apiKey.domain_ids!.includes(domain.id));
+  }
 
   return c.json({ success: true, data: filteredDomains });
 });
 
 // Get domain by ID
-domainsRouter.get('/:id', authMiddleware, requireDomainAccessFromParam('view'), async (c) => {
-  const id = c.req.param('id');
+domainsRouter.get('/:id', authOrApiKeyMiddleware, requireApiKeyScope('domains:read'), requireDomainAccessFromParam('view'), async (c) => {
+  const id = requirePathParam(c.req.param('id'), 'id');
+  assertApiKeyDomainScope(c, id);
   const domain = await getDomainById(c.env, id);
 
   if (!domain) {
@@ -105,7 +116,7 @@ domainsRouter.post('/', authMiddleware, requireRole(['admin', 'owner']), validat
 
 // Update domain (admin only)
 domainsRouter.put('/:id', authMiddleware, requireDomainAccessFromParam('edit'), validateJson(updateDomainSchema), async (c) => {
-  const id = c.req.param('id');
+  const id = requirePathParam(c.req.param('id'), 'id');
   const validated = c.req.valid('json');
 
   const existingDomain = await getDomainById(c.env, id);
@@ -157,7 +168,7 @@ domainsRouter.put('/:id', authMiddleware, requireDomainAccessFromParam('edit'), 
 
 // Toggle domain status (admin only - activate/deactivate)
 domainsRouter.delete('/:id', authMiddleware, requireDomainAccessFromParam('delete'), async (c) => {
-  const id = c.req.param('id');
+  const id = requirePathParam(c.req.param('id'), 'id');
   const hardDelete = c.req.query('hard') === 'true';
 
   const domain = await getDomainById(c.env, id);
@@ -179,4 +190,3 @@ domainsRouter.delete('/:id', authMiddleware, requireDomainAccessFromParam('delet
 });
 
 export { domainsRouter };
-

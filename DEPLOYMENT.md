@@ -1,5 +1,7 @@
 # Deployment Guide
 
+> `go.sstb.ai` operators must use [`docs/go-sstb-ai-operations.md`](docs/go-sstb-ai-operations.md). This upstream guide is retained for general self-hosting and does not describe the fork's isolated preview/production resources, native rate limits, or custom-domain gate.
+
 This guide explains how to **manually deploy** the Link Shortener & Tracker to Cloudflare Workers using the terminal.
 
 > **Tip**: For a faster, automated setup, use the **[One-Click Deployment](README.md#one-click-deployment)** method described in the README.

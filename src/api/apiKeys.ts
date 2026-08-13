@@ -13,7 +13,6 @@ import type { Env, Variables } from '../types';
 import {
   createApiKey,
   getApiKeyById,
-  listApiKeys,
   updateApiKey,
   revokeApiKey,
   deleteApiKey,
@@ -24,6 +23,8 @@ import { validateJson } from '../middleware/validate';
 import { requireRole } from '../middleware/authorization';
 import { getDomainById, listDomains } from '../db/domains';
 import { createApiKeySchema, updateApiKeySchema } from '../schemas';
+import { requirePathParam } from '../utils/request';
+import { parseApiKeyScopes } from '../utils/apiScopes';
 
 const apiKeysRouter = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -45,6 +46,7 @@ apiKeysRouter.get('/', authMiddleware, requireRole(['admin', 'owner']), async (c
     last_used_at: number | null;
     created_at: number;
     status: string;
+    scopes: string;
   }>();
 
   const allKeys = apiKeysResult.results || [];
@@ -88,6 +90,7 @@ apiKeysRouter.get('/', authMiddleware, requireRole(['admin', 'owner']), async (c
       last_used_at: key.last_used_at || null,
       created_at: key.created_at,
       status: key.status,
+      scopes: parseApiKeyScopes(key.scopes),
     };
   });
 
@@ -96,7 +99,7 @@ apiKeysRouter.get('/', authMiddleware, requireRole(['admin', 'owner']), async (c
 
 // Get API key by ID (admin only)
 apiKeysRouter.get('/:id', authMiddleware, requireRole(['admin', 'owner']), async (c) => {
-  const id = c.req.param('id');
+  const id = requirePathParam(c.req.param('id'), 'id');
   const apiKey = await getApiKeyById(c.env, id);
 
   if (!apiKey) {
@@ -116,6 +119,7 @@ apiKeysRouter.get('/:id', authMiddleware, requireRole(['admin', 'owner']), async
     last_used_at: apiKey.last_used_at || null,
     created_at: apiKey.created_at,
     status: apiKey.status,
+    scopes: parseApiKeyScopes(apiKey.scopes),
   };
 
   return c.json({ success: true, data: response });
@@ -131,17 +135,11 @@ apiKeysRouter.post('/', authMiddleware, requireRole(['admin', 'owner']), validat
   // Get user_id from validated body or use current admin user
   const userId = validated.user_id || (c.get('user') as { id: string }).id;
 
-  // Validate domains if provided
-  if (validated.domain_ids && validated.domain_ids.length > 0) {
-    // Get user's domains to verify ownership
-    const userDomains = await listDomains(c.env);
-
-    // For now, we'll allow any domain (could add user-domain ownership check later)
-    for (const domainId of validated.domain_ids) {
-      const domain = await getDomainById(c.env, domainId);
-      if (!domain) {
-        throw new HTTPException(404, { message: `Domain ${domainId} not found` });
-      }
+  // Agent credentials are always domain-scoped; future domains require an explicit update.
+  for (const domainId of validated.domain_ids) {
+    const domain = await getDomainById(c.env, domainId);
+    if (!domain) {
+      throw new HTTPException(404, { message: `Domain ${domainId} not found` });
     }
   }
 
@@ -165,6 +163,7 @@ apiKeysRouter.post('/', authMiddleware, requireRole(['admin', 'owner']), validat
     ip_whitelist: validated.ip_whitelist,
     allow_all_ips: validated.allow_all_ips,
     expires_at: validated.expires_at ?? undefined, // Keep null for "never expire", convert to undefined if not provided
+    scopes: validated.scopes,
   });
 
   // Format response (include full key ONLY on creation)
@@ -179,6 +178,7 @@ apiKeysRouter.post('/', authMiddleware, requireRole(['admin', 'owner']), validat
     expires_at: apiKeyWithKey.expires_at || null,
     created_at: apiKeyWithKey.created_at,
     status: apiKeyWithKey.status,
+    scopes: parseApiKeyScopes(apiKeyWithKey.scopes),
     api_key: apiKeyWithKey.api_key, // Only shown once!
   };
 
@@ -187,7 +187,7 @@ apiKeysRouter.post('/', authMiddleware, requireRole(['admin', 'owner']), validat
 
 // Update API key (admin only)
 apiKeysRouter.put('/:id', authMiddleware, requireRole(['admin', 'owner']), validateJson(updateApiKeySchema), async (c) => {
-  const id = c.req.param('id');
+  const id = requirePathParam(c.req.param('id'), 'id');
   const validated = c.req.valid('json');
 
   const existingKey = await getApiKeyById(c.env, id);
@@ -237,6 +237,9 @@ apiKeysRouter.put('/:id', authMiddleware, requireRole(['admin', 'owner']), valid
   if (validated.domain_ids !== undefined) {
     updates.domain_ids = validated.domain_ids;
   }
+  if (validated.scopes !== undefined) {
+    updates.scopes = validated.scopes;
+  }
 
   const updatedKey = await updateApiKey(c.env, id, updates);
   if (!updatedKey) {
@@ -256,6 +259,7 @@ apiKeysRouter.put('/:id', authMiddleware, requireRole(['admin', 'owner']), valid
     last_used_at: updatedKey.last_used_at || null,
     created_at: updatedKey.created_at,
     status: updatedKey.status,
+    scopes: parseApiKeyScopes(updatedKey.scopes),
   };
 
   return c.json({ success: true, data: response });
@@ -263,7 +267,7 @@ apiKeysRouter.put('/:id', authMiddleware, requireRole(['admin', 'owner']), valid
 
 // Revoke API key (admin only)
 apiKeysRouter.delete('/:id', authMiddleware, requireRole(['admin', 'owner']), async (c) => {
-  const id = c.req.param('id');
+  const id = requirePathParam(c.req.param('id'), 'id');
   const hardDelete = c.req.query('hard') === 'true';
 
   const existingKey = await getApiKeyById(c.env, id);
@@ -287,4 +291,3 @@ apiKeysRouter.delete('/:id', authMiddleware, requireRole(['admin', 'owner']), as
 });
 
 export { apiKeysRouter };
-

@@ -3,27 +3,16 @@
 # .dev.vars is gitignored and will be used by wrangler dev
 
 
-# Security: First user setup token
-# Choose a method based on your security needs:
-#
-# 🔐 PRODUCTION (Most Secure - Recommended):
-#    Generate with: openssl rand -hex 32
-#    Example: 692616a89e2eb7067a2cf1f992faa7a1eadc48d4b417a818c61d29c25eac3163
-#
-# 🛡️ PERSONAL USE (Good Security):
-#    Use a strong password (min 20 chars, mix of uppercase, lowercase, numbers, special chars)
-#    Example: MyVeryStr0ng!P@ssw0rd#2024$Secure
-#
-# 🔧 TESTING/DEVELOPMENT (Basic Security):
-#    Generate UUID with: uuidgen (Mac/Linux) or visit https://www.uuidgenerator.net/
-#    Example: 550e8400-e29b-41d4-a716-446655440000
-#
-# Note: This token is ONLY used once to create the first admin user.
-# After that, it's no longer checked. Choose the security level that matches your deployment.
+# One-time first-owner setup token. Generate independently for each environment.
+# Example command: openssl rand -hex 32
 SETUP_TOKEN=
+
+# Required for privacy-preserving, daily-rotating visitor identifiers.
+# Requests that would record analytics fail closed when this is absent.
+ANALYTICS_IP_HASH_SECRET=
 
 # Cloudflare API credentials (required for querying Analytics Engine)
 # Get your account ID from: https://dash.cloudflare.com/ (in the URL or right sidebar)
 CLOUDFLARE_ACCOUNT_ID=
-# Create API token with "Account Analytics Read" permission: https://dash.cloudflare.com/profile/api-tokens
+# Use a narrow token with Account Analytics Read only.
 CLOUDFLARE_API_TOKEN=
