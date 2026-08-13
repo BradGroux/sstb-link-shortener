@@ -32,10 +32,10 @@ describe('Digital Meld branding', () => {
     const markup = dashboardHtml('csrf-token', 'nonce');
     expect(markup).toContain('class="brand-logo brand-logo--on-light"');
     expect(markup).toContain('class="brand-logo brand-logo--on-dark"');
-    expect(markup).toContain('/dashboard/static/brand/digital-meld-on-light.svg?v=v4');
-    expect(markup).toContain('/dashboard/static/brand/digital-meld-on-dark.svg?v=v4');
+    expect(markup).toContain('/dashboard/static/brand/digital-meld-on-light.svg?v=v5');
+    expect(markup).toContain('/dashboard/static/brand/digital-meld-on-dark.svg?v=v5');
     expect(loginHtml('csrf-token', 'nonce', false)).toContain(
-      '/dashboard/static/brand/digital-meld-on-dark.svg?v=v4',
+      '/dashboard/static/brand/digital-meld-on-dark.svg?v=v5',
     );
     expect(baseCss).toContain('--navbar-bg: #ffffff');
     expect(baseCss).toContain('.nav-brand .brand-logo--on-dark { display: none; }');
@@ -61,6 +61,6 @@ describe('Digital Meld branding', () => {
   });
 
   it('uses a fresh stylesheet cache key for the branded header', () => {
-    expect(dashboardHtml('csrf-token', 'nonce')).toContain('/dashboard/static/base.css?v=v4');
+    expect(dashboardHtml('csrf-token', 'nonce')).toContain('/dashboard/static/base.css?v=v5');
   });
 });
