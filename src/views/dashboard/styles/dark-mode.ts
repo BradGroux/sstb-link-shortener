@@ -12,7 +12,7 @@ export const darkModeCss = `/* Dark Mode Overrides */
   --card-bg: #1e293b;
   --border-color: #334155;
   --sidebar-bg: #020617;
-  --navbar-bg: #1e293b;
+  --navbar-bg: #0f172a;
   --primary-color: #818cf8;
   --secondary-color: #94a3b8;
   --hover-bg: #334155;

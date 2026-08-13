@@ -13,7 +13,7 @@ export const loginHtml = (csrfToken: string, nonce: string, setupAvailable: bool
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login - OpenShort.link</title>
+  <title>Login - Digital Meld Link Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -21,7 +21,9 @@ export const loginHtml = (csrfToken: string, nonce: string, setupAvailable: bool
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; background: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
     .login-container { background: white; padding: 2.5rem; border-radius: 16px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); width: 100%; max-width: 420px; }
-    h1 { margin-bottom: 1.5rem; text-align: center; color: #334155; font-weight: 600; }
+    .login-brand { margin-bottom: 1.5rem; padding: 1rem 1.25rem; background: #0f172a; border-radius: 12px; }
+    .login-brand a { display: flex; align-items: center; justify-content: center; }
+    .login-brand img { display: block; width: min(100%, 264px); height: auto; }
     .form-group { margin-bottom: 1rem; }
     .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; color: #334155; font-size: 0.875rem; }
     .form-group input { width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 1rem; background: #f1f5f9; color: #334155; transition: all 0.2s; }
@@ -37,7 +39,7 @@ export const loginHtml = (csrfToken: string, nonce: string, setupAvailable: bool
 </head>
 <body>
   <div class="login-container">
-    <h1><a href="https://openshort.link/" target="_blank" rel="noopener" style="text-decoration: none; color: inherit; display: flex; align-items: center; justify-content: center; gap: 0.5rem;"><img src="${raw(LOGO_DATA_URI)}" alt="OpenShort.link" style="height: 160px; width: auto;" /></a></h1>
+    <div class="login-brand"><a href="https://digitalmeld.io/" target="_blank" rel="noopener"><img src="${raw(LOGO_DATA_URI)}" alt="Digital Meld" /></a></div>
     <form id="login-form">
       <input type="hidden" id="csrf-token" name="_csrf" value="${csrfToken}">
       <div class="form-group">

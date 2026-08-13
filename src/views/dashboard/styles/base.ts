@@ -12,7 +12,7 @@ export const baseCss = `/* Root Variables */
   --card-bg: #ffffff;
   --border-color: #e2e8f0;
   --sidebar-bg: #0f172a;
-  --navbar-bg: #ffffff;
+  --navbar-bg: #0f172a;
   --primary-color: #6366f1;
   --secondary-color: #64748b;
   --hover-bg: #f1f5f9;
@@ -76,10 +76,10 @@ body {
 .navbar { 
   background: var(--navbar-bg); 
   border-bottom: 1px solid var(--border-color); 
-  padding: 0 2rem; 
+  padding: 0.75rem 2rem;
   display: flex; 
   justify-content: space-between; 
-  align-items: flex-start; 
+  align-items: center;
   box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1); 
   line-height: 0;
 }
@@ -97,7 +97,8 @@ body {
   display: block; 
   margin: 0;
   padding: 0;
-  vertical-align: top;
+  width: auto;
+  height: 48px;
 }
 .nav-brand a {
   padding: 0;
@@ -107,7 +108,6 @@ body {
   line-height: 0;
 }
 .nav-items { display: flex; gap: 1rem; align-items: center; align-self: center; }
-.nav-brand { align-self: flex-start; }
 .domain-selector { 
   padding: 0.5rem 1rem; 
   border: 1px solid var(--input-border); 
@@ -117,7 +117,7 @@ body {
 }
 
 /* Container & Sidebar */
-.container { display: flex; height: calc(100vh - 60px); }
+.container { display: flex; height: calc(100vh - 73px); }
 .sidebar { 
   width: 250px; 
   background: var(--sidebar-bg); 
