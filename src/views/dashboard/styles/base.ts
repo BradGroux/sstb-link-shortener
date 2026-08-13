@@ -12,7 +12,7 @@ export const baseCss = `/* Root Variables */
   --card-bg: #ffffff;
   --border-color: #e2e8f0;
   --sidebar-bg: #0f172a;
-  --navbar-bg: #0f172a;
+  --navbar-bg: #ffffff;
   --primary-color: #6366f1;
   --secondary-color: #64748b;
   --hover-bg: #f1f5f9;
@@ -76,7 +76,7 @@ body {
 .navbar { 
   background: var(--navbar-bg); 
   border-bottom: 1px solid var(--border-color); 
-  padding: 0.75rem 2rem;
+  padding: 0.625rem 2rem;
   display: flex; 
   justify-content: space-between; 
   align-items: center;
@@ -98,8 +98,9 @@ body {
   margin: 0;
   padding: 0;
   width: auto;
-  height: 48px;
+  height: 40px;
 }
+.brand-logo--on-dark { display: none; }
 .nav-brand a {
   padding: 0;
   margin: 0;
@@ -117,7 +118,7 @@ body {
 }
 
 /* Container & Sidebar */
-.container { display: flex; height: calc(100vh - 73px); }
+.container { display: flex; height: calc(100vh - 61px); }
 .sidebar { 
   width: 250px; 
   background: var(--sidebar-bg); 

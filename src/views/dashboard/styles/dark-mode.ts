@@ -37,6 +37,9 @@ export const darkModeCss = `/* Dark Mode Overrides */
   --success-text: #86efac;
 }
 
+.dark-mode .brand-logo--on-light { display: none; }
+.dark-mode .brand-logo--on-dark { display: block; }
+
 .dark-mode .json-key { color: #79c0ff; }
 .dark-mode .json-string { color: #a5d6ff; }
 .dark-mode .json-number { color: #79c0ff; }
