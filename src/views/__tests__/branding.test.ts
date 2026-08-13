@@ -23,4 +23,8 @@ describe('Digital Meld branding', () => {
     expect(markup).toContain('alt="Digital Meld"');
     expect(markup).not.toContain('href="https://openshort.link/"');
   });
+
+  it('uses a fresh stylesheet cache key for the branded header', () => {
+    expect(dashboardHtml('csrf-token', 'nonce')).toContain('/dashboard/static/base.css?v=v3');
+  });
 });
