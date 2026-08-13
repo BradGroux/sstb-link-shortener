@@ -36,8 +36,10 @@ export function html(strings: TemplateStringsArray, ...values: unknown[]): strin
         result += strings[i];
         if (i < values.length) {
             const value = values[i];
-            // If value is an array, join it (recursively safe if items are strings)
-            if (Array.isArray(value)) {
+            if (value instanceof SafeHtml) {
+                result += value.toString();
+            } else if (Array.isArray(value)) {
+                // If value is an array, join it (recursively safe if items are strings)
                 result += value.join('');
             } else {
                 result += escapeHtml(value);

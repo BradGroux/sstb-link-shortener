@@ -152,9 +152,11 @@ app.get('/dashboard/__validate__', (c) => {
 // Dashboard - Login page (moved from /login to /dashboard/login)
 app.get('/dashboard/login', async (c) => {
   const { loginHtml } = await import('./views/auth');
+  const existingUsers = await c.env.DB.prepare('SELECT COUNT(*) as count FROM users').first<{ count: number }>();
+  const setupAvailable = (existingUsers?.count || 0) === 0;
   const csrfToken = c.get('csrfToken') || '';
   const nonce = c.get('nonce') || '';
-  return c.html(loginHtml(csrfToken, nonce));
+  return c.html(loginHtml(csrfToken, nonce, setupAvailable));
 });
 
 // Dashboard - Setup page (moved from /setup to /dashboard/setup)
