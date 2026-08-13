@@ -38,7 +38,7 @@ describe('Digital Meld branding', () => {
       '/dashboard/static/brand/digital-meld-on-dark.svg?v=v4',
     );
     expect(baseCss).toContain('--navbar-bg: #ffffff');
-    expect(baseCss).toContain('.brand-logo--on-dark { display: none; }');
+    expect(baseCss).toContain('.nav-brand .brand-logo--on-dark { display: none; }');
     expect(darkModeCss).toContain('.dark-mode .brand-logo--on-light { display: none; }');
     expect(darkModeCss).toContain('.dark-mode .brand-logo--on-dark { display: block; }');
   });

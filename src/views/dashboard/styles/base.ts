@@ -100,7 +100,7 @@ body {
   width: auto;
   height: 40px;
 }
-.brand-logo--on-dark { display: none; }
+.nav-brand .brand-logo--on-dark { display: none; }
 .nav-brand a {
   padding: 0;
   margin: 0;
