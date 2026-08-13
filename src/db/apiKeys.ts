@@ -10,6 +10,7 @@
 import type { ApiKey, ApiKeyCreateRequest, Domain, Env } from '../types';
 import { generateId } from '../utils/id';
 import { hashApiKey } from '../utils/crypto';
+import { parseApiKeyScopes } from '../utils/apiScopes';
 
 export interface ApiKeyWithKey extends ApiKey {
   api_key: string; // Only returned on creation
@@ -49,9 +50,9 @@ export async function createApiKey(
   await env.DB.prepare(
     `INSERT INTO api_keys (
       id, user_id, name, key_hash, key_prefix,
-      ip_whitelist, allow_all_ips, expires_at,
+      ip_whitelist, allow_all_ips, expires_at, scopes,
       created_at, updated_at, status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
       id,
@@ -62,6 +63,7 @@ export async function createApiKey(
       ipWhitelistJson,
       data.allow_all_ips ? 1 : 0,
       data.expires_at || null,
+      JSON.stringify(data.scopes),
       now,
       now,
       'active'
@@ -93,6 +95,7 @@ export async function getApiKeyById(env: Env, id: string): Promise<ApiKey | null
   const domains = await getApiKeyDomains(env, id);
   return {
     ...result,
+    scopes: JSON.stringify(parseApiKeyScopes(result.scopes)),
     domain_ids: domains.map(d => d.id),
     domains,
   };
@@ -109,6 +112,7 @@ export async function getApiKeyByHash(env: Env, keyHash: string): Promise<ApiKey
   const domains = await getApiKeyDomains(env, result.id);
   return {
     ...result,
+    scopes: JSON.stringify(parseApiKeyScopes(result.scopes)),
     domain_ids: domains.map(d => d.id),
     domains,
   };
@@ -187,6 +191,7 @@ export async function updateApiKey(
     expires_at: number | null;
     status: 'active' | 'revoked' | 'expired';
     domain_ids: string[];
+    scopes: import('../utils/apiScopes').ApiKeyScope[];
   }>
 ): Promise<ApiKey | null> {
   const fields: string[] = [];
@@ -214,6 +219,10 @@ export async function updateApiKey(
   if (updates.status !== undefined) {
     fields.push('status = ?');
     values.push(updates.status);
+  }
+  if (updates.scopes !== undefined) {
+    fields.push('scopes = ?');
+    values.push(JSON.stringify(updates.scopes));
   }
 
   if (fields.length > 0) {
@@ -320,4 +329,3 @@ export async function setApiKeyDomains(env: Env, apiKeyId: string, domainIds: st
   // Execute all in one atomic transaction
   await env.DB.batch(statements);
 }
-

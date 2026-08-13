@@ -1,6 +1,5 @@
 # Dependencies
 node_modules/
-package-lock.json
 .pnp
 .pnp.js
 
@@ -43,11 +42,15 @@ yarn-error.log*
 coverage/
 .nyc_output/
 test/
+!mcp/test/
+!mcp/test/**
 example/
 
 # Documentation
 documentation/
 docs/
+!docs/
+!docs/go-sstb-ai-operations.md
 Claude.md
 
 # Misc

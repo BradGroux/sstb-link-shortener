@@ -53,18 +53,24 @@ import { detectCountryCode, getCountryName } from '../utils/countryMappings';
 import { authMiddleware, authOrApiKeyMiddleware } from '../middleware/auth';
 import { validateJson } from '../middleware/validate';
 import { deleteCachedLink, setCachedLink } from '../services/cache';
-import { requireLinkAccess, requirePermission } from '../middleware/authorization';
+import {
+  assertApiKeyScope,
+  requireApiKeyScope,
+  requireLinkAccess,
+  requirePermission,
+} from '../middleware/authorization';
 import { canAccessDomain } from '../utils/permissions';
 import { isInfiniteRedirect } from '../utils/domains';
 import { getEffectiveLinkRoute } from '../utils/route';
 import { createLinkSchema, updateLinkSchema, ogFetchSchema } from '../schemas';
+import { requirePathParam } from '../utils/request';
 
 const linksRouter = new Hono<{ Bindings: Env }>();
 
 // Schemas imported from ../schemas
 
 // List links
-linksRouter.get('/', authOrApiKeyMiddleware, async (c) => {
+linksRouter.get('/', authOrApiKeyMiddleware, requireApiKeyScope('links:read'), async (c) => {
   const domainId = c.req.query('domain_id');
   const status = c.req.query('status');
   let search = c.req.query('search');
@@ -161,12 +167,12 @@ linksRouter.get('/', authOrApiKeyMiddleware, async (c) => {
   let accessibleDomainIds: string[] | undefined = undefined;
   const hasGlobalAccess = user?.global_access || user?.role === 'admin' || user?.role === 'owner';
 
-  if (!hasGlobalAccess && user) {
+  if (apiKey?.domain_ids?.length) {
+    // API key restrictions always win over the owning user's global role.
+    accessibleDomainIds = apiKey.domain_ids;
+  } else if (!hasGlobalAccess && user) {
     // Use cached domain IDs from context (already fetched in authMiddleware)
     accessibleDomainIds = (user as any).accessible_domain_ids;
-  } else if (apiKey && apiKey.domain_ids && apiKey.domain_ids.length > 0) {
-    // Use API key domain restrictions
-    accessibleDomainIds = apiKey.domain_ids;
   }
 
   // If tag or category filtering is needed, use optimized JOIN queries
@@ -376,8 +382,8 @@ linksRouter.get('/by-destination', authMiddleware, async (c) => {
 });
 
 // Get link by ID
-linksRouter.get('/:id', authOrApiKeyMiddleware, async (c) => {
-  const id = c.req.param('id');
+linksRouter.get('/:id', authOrApiKeyMiddleware, requireApiKeyScope('links:read'), async (c) => {
+  const id = requirePathParam(c.req.param('id'), 'id');
   const link = await getLinkById(c.env, id);
 
   if (!link) {
@@ -459,7 +465,7 @@ linksRouter.post('/og-fetch', authMiddleware, validateJson(ogFetchSchema), async
 // Note: Rate limiting intentionally removed for simplicity (internal/self-hosted use)
 // Production deployments should use Cloudflare's infrastructure-level rate limiting or add:
 // createRateLimit({ window: 60, max: 50, key: (c) => `link:create:${c.req.header('CF-Connecting-IP')}` })
-linksRouter.post('/', authOrApiKeyMiddleware, requirePermission('create_links'), validateJson(createLinkSchema), async (c) => {
+linksRouter.post('/', authOrApiKeyMiddleware, requireApiKeyScope('links:write'), requirePermission('create_links'), validateJson(createLinkSchema), async (c) => {
   const ip = c.req.header('cf-connecting-ip') || 'unknown';
 
   const validated = c.req.valid('json');
@@ -637,8 +643,8 @@ linksRouter.post('/', authOrApiKeyMiddleware, requirePermission('create_links'),
 });
 
 // Update link
-linksRouter.put('/:id', authOrApiKeyMiddleware, requireLinkAccess('edit'), validateJson(updateLinkSchema), async (c) => {
-  const id = c.req.param('id');
+linksRouter.put('/:id', authOrApiKeyMiddleware, requireApiKeyScope('links:write'), requireLinkAccess('edit'), validateJson(updateLinkSchema), async (c) => {
+  const id = requirePathParam(c.req.param('id'), 'id');
   const validated = c.req.valid('json');
 
   // Use getLinkByIdIncludingDeleted to allow restoring deleted links
@@ -811,8 +817,8 @@ linksRouter.put('/:id', authOrApiKeyMiddleware, requireLinkAccess('edit'), valid
 });
 
 // Delete link
-linksRouter.delete('/:id', authOrApiKeyMiddleware, requireLinkAccess('delete'), async (c) => {
-  const id = c.req.param('id');
+linksRouter.delete('/:id', authOrApiKeyMiddleware, requireApiKeyScope('links:delete'), requireLinkAccess('delete'), async (c) => {
+  const id = requirePathParam(c.req.param('id'), 'id');
   const hardDelete = c.req.query('hard') === 'true';
 
   // Use getLinkByIdIncludingDeleted to check if link exists (including deleted ones)
@@ -865,6 +871,7 @@ linksRouter.post('/bulk', authOrApiKeyMiddleware, requirePermission('edit_links'
   const results = [];
 
   if (action === 'delete') {
+    assertApiKeyScope(c, 'links:delete');
     for (const id of link_ids) {
       const link = await getLinkById(c.env, id);
       if (link) {
@@ -887,6 +894,7 @@ linksRouter.post('/bulk', authOrApiKeyMiddleware, requirePermission('edit_links'
       }
     }
   } else if (action === 'update' && updates) {
+    assertApiKeyScope(c, 'links:write');
     const validated = updateLinkSchema.partial().parse(updates);
     // Extract tags, category_id, route, metadata, geo_redirects, device_redirects, city_redirects, and os_redirects (they're handled separately)
     const { tags, category_id, route, metadata: metadataObj, geo_redirects, device_redirects, city_redirects, os_redirects, ...linkUpdates } = validated;
@@ -983,7 +991,7 @@ linksRouter.post('/bulk', authOrApiKeyMiddleware, requirePermission('edit_links'
 
 // Get links by status code
 linksRouter.get('/status/:statusCode', authMiddleware, async (c) => {
-  const statusCode = parseInt(c.req.param('statusCode'));
+  const statusCode = parseInt(requirePathParam(c.req.param('statusCode'), 'statusCode'));
   const domainId = c.req.query('domain_id');
   const destinationUrl = c.req.query('destination_url');
   const limitParam = c.req.query('limit');
@@ -1080,4 +1088,3 @@ linksRouter.post('/check-status', authMiddleware, async (c) => {
 });
 
 export { linksRouter };
-

@@ -1,0 +1,58 @@
+name = "sstb-link-shortener-preview"
+main = "src/index.ts"
+compatibility_date = "2026-08-13"
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
+workers_dev = true
+preview_urls = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "sstb-link-shortener-preview"
+database_id = "b56b6810-9d0d-4ffb-af27-384914bfc9fe"
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "004725fd5c764d84a41c7e6be36cc120"
+
+[[analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "sstb-link-shortener-preview"
+
+[vars]
+ENVIRONMENT = "preview"
+LOG_LEVEL = "info"
+CACHE_TTL = "604800"
+MAX_LINKS_PER_DOMAIN = "10000"
+CLOUDFLARE_ACCOUNT_ID = "323b20dd391cf458a421175f42155056"
+ANALYTICS_DATASET_NAME = "sstb-link-shortener-preview"
+
+[[ratelimits]]
+name = "LOGIN_RATE_LIMITER"
+namespace_id = "731011"
+simple = { limit = 5, period = 60 }
+
+[[ratelimits]]
+name = "REGISTER_RATE_LIMITER"
+namespace_id = "731012"
+simple = { limit = 3, period = 60 }
+
+[[ratelimits]]
+name = "REFRESH_RATE_LIMITER"
+namespace_id = "731013"
+simple = { limit = 10, period = 60 }
+
+[[ratelimits]]
+name = "API_AUTH_RATE_LIMITER"
+namespace_id = "731014"
+simple = { limit = 60, period = 60 }
+
+[observability]
+enabled = false
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+invocation_logs = true
+
+[placement]
+mode = "smart"

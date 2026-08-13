@@ -180,18 +180,29 @@ export function extractUtmParams(url: URL): {
   };
 }
 
-export function hashIpAddress(ip: string): string {
-  // Simple hash for privacy (in production, use proper hashing)
-  // This is a placeholder - implement proper hashing
-  // Use base64 encoding available in Workers runtime
+export async function hashIpAddress(
+  ip: string,
+  secret: string | undefined,
+  date = new Date()
+): Promise<string> {
+  if (!secret) {
+    throw new Error('ANALYTICS_IP_HASH_SECRET is required');
+  }
+
+  const day = date.toISOString().slice(0, 10);
   const encoder = new TextEncoder();
-  const data = encoder.encode(ip);
-  // Simple hash - in production use crypto.subtle
-  const bytes = Array.from(data);
-  return bytes
-    .map((b: number) => b.toString(16).padStart(2, '0'))
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const digest = await crypto.subtle.sign('HMAC', key, encoder.encode(`${day}:${ip}`));
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('')
-    .substring(0, 16);
+    .slice(0, 32);
 }
 
 /**

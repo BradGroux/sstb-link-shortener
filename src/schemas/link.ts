@@ -9,6 +9,7 @@
 // Phase 4: Schema Composition & Type Inference
 
 import { z } from 'zod';
+import { httpUrlSchema } from './common';
 
 // ============================================================================
 // Shared Components
@@ -19,7 +20,7 @@ import { z } from 'zod';
  */
 export const geoRedirectSchema = z.object({
   country_code: z.string().length(2).transform((val) => val.toUpperCase()),
-  destination_url: z.string().url(),
+  destination_url: httpUrlSchema,
 });
 
 /**
@@ -27,7 +28,7 @@ export const geoRedirectSchema = z.object({
  */
 export const deviceRedirectSchema = z.object({
   device_type: z.enum(['desktop', 'mobile', 'tablet']),
-  destination_url: z.string().url(),
+  destination_url: httpUrlSchema,
 });
 
 /**
@@ -35,7 +36,7 @@ export const deviceRedirectSchema = z.object({
  */
 export const cityRedirectSchema = z.object({
   city_name: z.string().min(1).transform((val) => val.toLowerCase()),
-  destination_url: z.string().url(),
+  destination_url: httpUrlSchema,
 });
 
 /**
@@ -43,7 +44,7 @@ export const cityRedirectSchema = z.object({
  */
 export const osRedirectSchema = z.object({
   os: z.enum(['android', 'ios']),
-  destination_url: z.string().url(),
+  destination_url: httpUrlSchema,
 });
 
 /**
@@ -52,7 +53,7 @@ export const osRedirectSchema = z.object({
 export const ogMetaSchema = z.object({
   og_title: z.string().max(255).optional(),
   og_description: z.string().max(500).optional(),
-  og_image: z.string().url().optional(),
+  og_image: httpUrlSchema.optional(),
   og_type: z.enum(['website', 'article', 'product', 'video.other']).default('website'),
   twitter_card: z.enum(['summary', 'summary_large_image']).default('summary_large_image'),
 });
@@ -65,7 +66,7 @@ export const ogMetaSchema = z.object({
  * Base link schema with all shared fields between create and update
  */
 const baseLinkSchema = z.object({
-  destination_url: z.string().url(),
+  destination_url: httpUrlSchema,
   title: z.string().max(255).optional(),
   description: z.string().max(5000).optional(),
   redirect_code: z.number().int().min(301).max(308).default(301),
@@ -158,7 +159,7 @@ export type OgMetaSchemaInput = z.infer<typeof ogMetaSchema>;
  * Body schema for the "Fetch from URL" action — scrapes the destination's OG tags.
  */
 export const ogFetchSchema = z.object({
-  url: z.string().url(),
+  url: httpUrlSchema,
 });
 
 export type OgFetchInput = z.infer<typeof ogFetchSchema>;

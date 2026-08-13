@@ -54,7 +54,7 @@ export async function handleRedirect(
   request: Request,
   domain: Domain, // Accept domain object instead of just domain name
   slug: string,
-  executionCtx?: ExecutionContext,
+  executionCtx?: { waitUntil(promise: Promise<unknown>): void },
   matchedRoute?: string // New optional parameter for strict routing
 ): Promise<Response> {
   // DEBUG: Log IMMEDIATELY at the very start - this should always appear
@@ -441,7 +441,7 @@ async function trackClickAsync(
     } = extractUtmParams(url);
 
     const timestamp = Date.now();
-    const hashedIp = hashIpAddress(ipAddress);
+    const hashedIp = await hashIpAddress(ipAddress, env.ANALYTICS_IP_HASH_SECRET);
     const date = formatDateForGrouping(timestamp, 'day');
     const referrerDomain = extractReferrerDomain(referrer);
 

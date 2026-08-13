@@ -1980,9 +1980,9 @@ export function dashboardHtml(csrfToken: string, nonce: string): string {
         }
         container.innerHTML = domains.data?.map(domain => 
           '<div class="domain-card">' +
-            '<h3>' + domain.domain_name + '</h3>' +
-            '<p>Path: ' + domain.routing_path + '</p>' +
-            '<p>Status: ' + domain.status + '</p>' +
+            '<h3>' + escapeHtml(domain.domain_name) + '</h3>' +
+            '<p>Path: ' + escapeHtml(domain.routing_path) + '</p>' +
+            '<p>Status: ' + escapeHtml(domain.status) + '</p>' +
           '</div>'
         ).join('') || '';
       } catch (error) {
@@ -3186,8 +3186,8 @@ export function dashboardHtml(csrfToken: string, nonce: string): string {
       if (!container) return;
       
       container.innerHTML = selectedTags.map(tag => 
-        '<span class="tag-badge" style="background: ' + (tag.color || '#007bff') + '; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; cursor: pointer;" data-tag-id="' + tag.id + '" onclick="removeTag(this.dataset.tagId)">' +
-          tag.name + ' ×' +
+        '<span class="tag-badge" style="background: ' + escapeAttr(tag.color || '#007bff') + '; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; cursor: pointer;" data-tag-id="' + escapeAttr(tag.id) + '" onclick="removeTag(this.dataset.tagId)">' +
+          escapeHtml(tag.name) + ' ×' +
         '</span>'
       ).join('');
     }
@@ -3218,7 +3218,7 @@ export function dashboardHtml(csrfToken: string, nonce: string): string {
         item.className = 'dropdown-item';
         item.setAttribute('data-value', tag.id);
         item.style.cssText = 'padding: 0.5rem; cursor: pointer; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 0.5rem;';
-        item.innerHTML = '<span style="width: 12px; height: 12px; border-radius: 2px; background: ' + (tag.color || '#007bff') + '; display: inline-block;"></span><span>' + tag.name + '</span>';
+        item.innerHTML = '<span style="width: 12px; height: 12px; border-radius: 2px; background: ' + escapeAttr(tag.color || '#007bff') + '; display: inline-block;"></span><span>' + escapeHtml(tag.name) + '</span>';
         item.addEventListener('click', () => {
           document.getElementById('tag-filter').value = tag.id;
           document.getElementById('tag-filter-search').value = tag.name;
@@ -4928,7 +4928,7 @@ export function dashboardHtml(csrfToken: string, nonce: string): string {
         const tagDropdown = document.getElementById('analytics-tag-filter-dropdown');
         if (tagDropdown && tags.length > 0) {
           const tagItems = tags.map(t => 
-            '<div class="dropdown-item" data-value="' + t.id + '" style="padding: 0.5rem; cursor: pointer; border-bottom: 1px solid var(--border-color);">' + t.name + '</div>'
+            '<div class="dropdown-item" data-value="' + escapeAttr(t.id) + '" style="padding: 0.5rem; cursor: pointer; border-bottom: 1px solid var(--border-color);">' + escapeHtml(t.name) + '</div>'
           ).join('');
           tagDropdown.innerHTML = '<div class="dropdown-item" data-value="" style="padding: 0.5rem; cursor: pointer; border-bottom: 1px solid var(--border-color);">All Tags</div>' + tagItems;
         }
@@ -4943,7 +4943,7 @@ export function dashboardHtml(csrfToken: string, nonce: string): string {
         const categoryDropdown = document.getElementById('analytics-category-filter-dropdown');
         if (categoryDropdown && categories.length > 0) {
           const categoryItems = categories.map(c => 
-            '<div class="dropdown-item" data-value="' + c.id + '" style="padding: 0.5rem; cursor: pointer; border-bottom: 1px solid var(--border-color);">' + c.name + '</div>'
+            '<div class="dropdown-item" data-value="' + escapeAttr(c.id) + '" style="padding: 0.5rem; cursor: pointer; border-bottom: 1px solid var(--border-color);">' + escapeHtml(c.name) + '</div>'
           ).join('');
           categoryDropdown.innerHTML = '<div class="dropdown-item" data-value="" style="padding: 0.5rem; cursor: pointer; border-bottom: 1px solid var(--border-color);">All Categories</div>' + categoryItems;
         }
@@ -5174,7 +5174,7 @@ export function dashboardHtml(csrfToken: string, nonce: string): string {
       
       const html = geography.slice(0, 10).map(g => 
         '<div style="display: flex; justify-content: space-between; padding: 0.5rem; border-bottom: 1px solid var(--border-color);">' +
-          '<span>' + (g.country || 'Unknown') + (g.city ? ', ' + g.city : '') + '</span>' +
+          '<span>' + escapeHtml(g.country || 'Unknown') + (g.city ? ', ' + escapeHtml(g.city) : '') + '</span>' +
           '<span style="font-weight: 600;">' + (g.clicks || 0).toLocaleString() + '</span>' +
         '</div>'
       ).join('');
@@ -5194,7 +5194,7 @@ export function dashboardHtml(csrfToken: string, nonce: string): string {
       
       const html = referrers.slice(0, 10).map(r => 
         '<div style="display: flex; justify-content: space-between; padding: 0.5rem; border-bottom: 1px solid var(--border-color);">' +
-          '<span>' + (r.referrer_domain || 'Direct') + '</span>' +
+          '<span>' + escapeHtml(r.referrer_domain || 'Direct') + '</span>' +
           '<span style="font-weight: 600;">' + (r.clicks || 0).toLocaleString() + '</span>' +
         '</div>'
       ).join('');
@@ -5215,9 +5215,9 @@ export function dashboardHtml(csrfToken: string, nonce: string): string {
       const html = utmCampaigns.slice(0, 10).map(u => 
         '<div style="display: flex; justify-content: space-between; padding: 0.5rem; border-bottom: 1px solid var(--border-color);">' +
           '<span>' + 
-            (u.utm_source || '') + 
-            (u.utm_medium ? ' / ' + u.utm_medium : '') + 
-            (u.utm_campaign ? ' / ' + u.utm_campaign : '') +
+            escapeHtml(u.utm_source || '') +
+            (u.utm_medium ? ' / ' + escapeHtml(u.utm_medium) : '') +
+            (u.utm_campaign ? ' / ' + escapeHtml(u.utm_campaign) : '') +
           '</span>' +
           '<span style="font-weight: 600;">' + (u.clicks || 0).toLocaleString() + '</span>' +
         '</div>'
@@ -7878,10 +7878,10 @@ export function dashboardHtml(csrfToken: string, nonce: string): string {
             const date = new Date(log.created_at);
             return '<tr style="border-bottom: 1px solid var(--border-color);">' +
               '<td style="padding: 0.75rem;">' + date.toLocaleString() + '</td>' +
-              '<td style="padding: 0.75rem;"><span class="status-badge status-' + log.event_type + '">' + log.event_type + '</span></td>' +
-              '<td style="padding: 0.75rem;">' + (log.ip_address || 'N/A') + '</td>' +
-              '<td style="padding: 0.75rem;" title="' + (log.user_agent || '') + '">' + 
-                (log.user_agent ? (log.user_agent.length > 50 ? log.user_agent.substring(0, 50) + '...' : log.user_agent) : 'N/A') + 
+              '<td style="padding: 0.75rem;"><span class="status-badge status-' + escapeAttr(log.event_type) + '">' + escapeHtml(log.event_type) + '</span></td>' +
+              '<td style="padding: 0.75rem;">' + escapeHtml(log.ip_address || 'N/A') + '</td>' +
+              '<td style="padding: 0.75rem;" title="' + escapeAttr(log.user_agent || '') + '">' +
+                escapeHtml(log.user_agent ? (log.user_agent.length > 50 ? log.user_agent.substring(0, 50) + '...' : log.user_agent) : 'N/A') +
               '</td>' +
               '</tr>';
           }).join('') +
@@ -14284,8 +14284,8 @@ function renderTopLocations(data, containerId) {
   const html = topGeo.map(item => [
     '<div class="list-item">',
       '<span class="list-item-label">',
-        (item.country || 'Unknown'),
-        (item.city ? '<span style="color:var(--secondary-color);font-size:0.8em">(' + item.city + ')</span>' : ''),
+        escapeHtml(item.country || 'Unknown'),
+        (item.city ? '<span style="color:var(--secondary-color);font-size:0.8em">(' + escapeHtml(item.city) + ')</span>' : ''),
       '</span>',
       '<span class="list-item-value">' + item.clicks.toLocaleString() + '</span>',
     '</div>'
@@ -14307,7 +14307,7 @@ function renderTopReferrers(data, containerId) {
   
   const html = topRefs.map(item => [
     '<div class="list-item">',
-      '<span class="list-item-label">' + (item.referer || 'Direct / None') + '</span>',
+      '<span class="list-item-label">' + escapeHtml(item.referer || item.referrer_domain || 'Direct / None') + '</span>',
       '<span class="list-item-value">' + item.clicks.toLocaleString() + '</span>',
     '</div>'
   ].join('')).join('');
@@ -14328,7 +14328,7 @@ function renderTopUTM(data, containerId) {
   
   const html = topCampaigns.map(item => [
     '<div class="list-item">',
-      '<span class="list-item-label">' + (item.utm_campaign || '(not set)') + '</span>',
+      '<span class="list-item-label">' + escapeHtml(item.utm_campaign || '(not set)') + '</span>',
       '<span class="list-item-value">' + item.clicks.toLocaleString() + '</span>',
     '</div>'
   ].join('')).join('');

@@ -10,11 +10,15 @@
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
-import type { Env, User, AnalyticsDevice, AnalyticsUtm } from '../types';
+import type { Env, User, ApiKeyContext, AnalyticsDevice, AnalyticsUtm } from '../types';
 import { getLinkById, listLinks, countLinks } from '../db/links';
 import { getDomainByName } from '../db/domains';
-import { authMiddleware } from '../middleware/auth';
-import { requirePermission } from '../middleware/authorization';
+import { authMiddleware, authOrApiKeyMiddleware } from '../middleware/auth';
+import {
+  assertApiKeyDomainScope,
+  requireApiKeyScope,
+  requirePermission,
+} from '../middleware/authorization';
 import { canAccessDomain } from '../utils/permissions';
 import {
   getDailyAnalytics,
@@ -71,6 +75,7 @@ import {
   type AnalyticsEngineFilters,
 } from '../services/analyticsEngineQuery';
 import { getAnalyticsAggregationEnabledOrDefault } from '../db/settings';
+import { requirePathParam } from '../utils/request';
 
 /**
  * Get cache key for analytics data
@@ -177,14 +182,16 @@ const analyticsQuerySchema = z.object({
 });
 
 // Get link analytics
-analyticsRouter.get('/links/:id', authMiddleware, requirePermission('view_analytics'), async (c) => {
+analyticsRouter.get('/links/:id', authOrApiKeyMiddleware, requireApiKeyScope('analytics:read'), requirePermission('view_analytics'), async (c) => {
   try {
-    const id = c.req.param('id');
+    const id = requirePathParam(c.req.param('id'), 'id');
     const link = await getLinkById(c.env, id);
 
     if (!link) {
       throw new HTTPException(404, { message: 'Link not found' });
     }
+
+    assertApiKeyDomainScope(c, link.domain_id);
 
     // Check domain access
     const user = (c as any).get('user') as User;
@@ -620,7 +627,7 @@ analyticsRouter.get('/links/:id', authMiddleware, requirePermission('view_analyt
 });
 
 // Get dashboard analytics
-analyticsRouter.get('/dashboard', authMiddleware, requirePermission('view_analytics'), async (c) => {
+analyticsRouter.get('/dashboard', authOrApiKeyMiddleware, requireApiKeyScope('analytics:read'), requirePermission('view_analytics'), async (c) => {
   try {
     const queryParams = analyticsQuerySchema.parse({
       link_id: c.req.query('link_id'),
@@ -636,12 +643,15 @@ analyticsRouter.get('/dashboard', authMiddleware, requirePermission('view_analyt
     });
 
     const user = (c as any).get('user') as User;
+    const apiKey = (c as any).get('apiKey') as ApiKeyContext | undefined;
 
     // Get accessible domain IDs
     const hasGlobalAccess = user.global_access || user.role === 'admin' || user.role === 'owner';
     let accessibleDomainIds: string[] = [];
 
-    if (!hasGlobalAccess) {
+    if (apiKey?.domain_ids?.length) {
+      accessibleDomainIds = apiKey.domain_ids;
+    } else if (!hasGlobalAccess) {
       accessibleDomainIds = (user as any).accessible_domain_ids || [];
       if (accessibleDomainIds.length === 0) {
         // No accessible domains
@@ -661,6 +671,7 @@ analyticsRouter.get('/dashboard', authMiddleware, requirePermission('view_analyt
 
     // Check domain access if domain_id is provided
     if (queryParams.domain_id) {
+      assertApiKeyDomainScope(c, queryParams.domain_id);
       const hasAccess = await canAccessDomain(c.env, user, queryParams.domain_id);
       if (!hasAccess) {
         throw new HTTPException(403, { message: 'Access denied. You do not have access to this domain.' });
@@ -700,7 +711,7 @@ analyticsRouter.get('/dashboard', authMiddleware, requirePermission('view_analyt
     }
 
     // Check cache (include filters in cache key)
-    const cacheKey = getAnalyticsCacheKey('dashboard', user.id, {
+    const cacheKey = getAnalyticsCacheKey('dashboard', apiKey ? `key:${apiKey.api_key_id}` : `user:${user.id}`, {
       domain_id: queryParams.domain_id,
       domain_names: queryParams.domain_names?.join(','),
       tag_ids: queryParams.tag_ids?.join(','),
@@ -741,7 +752,7 @@ analyticsRouter.get('/dashboard', authMiddleware, requirePermission('view_analyt
       domain_ids: domainIdsFromNames || queryParams.domain_ids,
       tag_ids: queryParams.tag_ids,
       category_ids: queryParams.category_ids,
-    });
+    }, apiKey);
 
     // Build Analytics Engine filters based on query parameters
     // Priority: domain_names (direct) > tag_ids/category_ids (requires link ID lookup)
@@ -1272,13 +1283,15 @@ analyticsRouter.get('/dashboard', authMiddleware, requirePermission('view_analyt
 });
 
 // Get time series for a link
-analyticsRouter.get('/links/:id/time-series', authMiddleware, requirePermission('view_analytics'), async (c) => {
-  const id = c.req.param('id');
+analyticsRouter.get('/links/:id/time-series', authOrApiKeyMiddleware, requireApiKeyScope('analytics:read'), requirePermission('view_analytics'), async (c) => {
+  const id = requirePathParam(c.req.param('id'), 'id');
   const link = await getLinkById(c.env, id);
 
   if (!link) {
     throw new HTTPException(404, { message: 'Link not found' });
   }
+
+  assertApiKeyDomainScope(c, link.domain_id);
 
   const user = (c as any).get('user') as User;
   const hasAccess = await canAccessDomain(c.env, user, link.domain_id);
@@ -1396,13 +1409,15 @@ analyticsRouter.get('/links/:id/time-series', authMiddleware, requirePermission(
 });
 
 // Get geography for a link
-analyticsRouter.get('/links/:id/geography', authMiddleware, requirePermission('view_analytics'), async (c) => {
-  const id = c.req.param('id');
+analyticsRouter.get('/links/:id/geography', authOrApiKeyMiddleware, requireApiKeyScope('analytics:read'), requirePermission('view_analytics'), async (c) => {
+  const id = requirePathParam(c.req.param('id'), 'id');
   const link = await getLinkById(c.env, id);
 
   if (!link) {
     throw new HTTPException(404, { message: 'Link not found' });
   }
+
+  assertApiKeyDomainScope(c, link.domain_id);
 
   const user = (c as any).get('user') as User;
   const hasAccess = await canAccessDomain(c.env, user, link.domain_id);
@@ -1523,13 +1538,15 @@ analyticsRouter.get('/links/:id/geography', authMiddleware, requirePermission('v
 });
 
 // Get referrers for a link
-analyticsRouter.get('/links/:id/referrers', authMiddleware, requirePermission('view_analytics'), async (c) => {
-  const id = c.req.param('id');
+analyticsRouter.get('/links/:id/referrers', authOrApiKeyMiddleware, requireApiKeyScope('analytics:read'), requirePermission('view_analytics'), async (c) => {
+  const id = requirePathParam(c.req.param('id'), 'id');
   const link = await getLinkById(c.env, id);
 
   if (!link) {
     throw new HTTPException(404, { message: 'Link not found' });
   }
+
+  assertApiKeyDomainScope(c, link.domain_id);
 
   const user = (c as any).get('user') as User;
   const hasAccess = await canAccessDomain(c.env, user, link.domain_id);
@@ -2027,7 +2044,8 @@ async function getAnalyticsFilters(
     domain_ids?: string[];
     tag_ids?: string[];
     category_ids?: string[];
-  }
+  },
+  apiKey?: ApiKeyContext
 ): Promise<{
   domainIds?: string[];
   tagIds?: string[];
@@ -2038,7 +2056,9 @@ async function getAnalyticsFilters(
   const hasGlobalAccess = user.global_access || user.role === 'admin' || user.role === 'owner';
   let accessibleDomainIds: string[] = [];
 
-  if (!hasGlobalAccess) {
+  if (apiKey?.domain_ids?.length) {
+    accessibleDomainIds = apiKey.domain_ids;
+  } else if (!hasGlobalAccess) {
     accessibleDomainIds = (user as any).accessible_domain_ids || [];
   }
 
@@ -2055,6 +2075,9 @@ async function getAnalyticsFilters(
   // Verify domain access
   if (domainIds && domainIds.length > 0) {
     for (const domainId of domainIds) {
+      if (apiKey?.domain_ids?.length && !apiKey.domain_ids.includes(domainId)) {
+        throw new HTTPException(403, { message: `Domain ${domainId} is not on API key scope.` });
+      }
       const hasAccess = await canAccessDomain(env, user, domainId);
       if (!hasAccess) {
         throw new HTTPException(403, { message: `Access denied. You do not have access to domain ${domainId}.` });

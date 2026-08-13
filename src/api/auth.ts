@@ -37,8 +37,7 @@ const authRouter = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // Login
 authRouter.post('/login', createRateLimit({
-  window: 60,
-  max: 5,
+  binding: 'LOGIN_RATE_LIMITER',
   key: (c) => `auth:login:${c.req.header('CF-Connecting-IP') || 'unknown'}`,
 }), validateJson(loginSchema), async (c) => {
   const validated = c.req.valid('json');
@@ -143,8 +142,7 @@ authRouter.post('/login', createRateLimit({
 // First user requires SETUP_TOKEN from environment
 // Subsequent users can only be created by admin/owner via API
 authRouter.post('/register', createRateLimit({
-  window: 60,
-  max: 3,
+  binding: 'REGISTER_RATE_LIMITER',
   key: (c) => `auth:register:${c.req.header('CF-Connecting-IP') || 'unknown'}`,
 }), optionalAuth, validateJson(registerSchema), async (c) => {
   // Check if any users exist
@@ -296,8 +294,7 @@ authRouter.post('/logout', optionalAuth, async (c) => {
 // Note: Supports both JSON body and cookie-only (empty body) scenarios
 
 authRouter.post('/refresh', createRateLimit({
-  window: 60,
-  max: 10,
+  binding: 'REFRESH_RATE_LIMITER',
   key: (c) => `auth:refresh:${c.req.header('CF-Connecting-IP') || 'unknown'}`,
 }), async (c) => {
   // Handle empty body gracefully (for cookie-only requests)
@@ -860,4 +857,3 @@ authRouter.post('/token', authMiddleware, async (c) => {
 });
 
 export { authRouter };
-

@@ -1,5 +1,7 @@
 # OpenShort.link - The All-in-One Open Source Serverless URL Link Shortener. 100% on Cloudflare + 1 Click Install
 
+> SSTB deployment: this fork is hardened and configured for `go.sstb.ai`. See [go.sstb.ai operations](docs/go-sstb-ai-operations.md) for the environment map, safety gates, agent API, and deployment commands. The upstream one-click instructions below are not the production runbook for this fork.
+
 <div align="center">
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)

@@ -1,0 +1,12 @@
+{
+  "name": "@sstb/link-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "sstb-link-mcp": "./src/server.mjs"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

@@ -15,103 +15,10 @@ import { getUserById } from '../db/users';
 import { getUserDomainIds } from '../db/userDomains';
 import { verifyApiKey } from '../utils/crypto';
 import { getApiKeyByHash, listApiKeys, updateLastUsed } from '../db/apiKeys';
+import { parseApiKeyScopes } from '../utils/apiScopes';
 
 // Domain cache TTL (5 minutes) - matches session.ts
 const DOMAIN_CACHE_TTL = 5 * 60;
-
-// Failed auth rate limit: configurable via environment variables
-// Default: 5 failures per 2 hours (7200 seconds) for production security
-// Can be overridden in wrangler.toml for development/testing (e.g., 60 seconds)
-const getFailedAuthLimit = (env: Env): number => {
-  const parsed = parseInt(env.FAILED_AUTH_LIMIT || '5');
-  return isNaN(parsed) ? 5 : parsed;
-};
-
-const getFailedAuthWindow = (env: Env): number => {
-  const parsed = parseInt(env.FAILED_AUTH_WINDOW || '7200');
-  return isNaN(parsed) ? 7200 : parsed; // Default 2 hours
-};
-
-// Rate limit data structure for fixed-window rate limiting
-interface RateLimitData {
-  firstFailure: number;  // Unix timestamp (seconds) of first failure in window
-  count: number;         // Number of failures in current window
-}
-
-// Helper: Check if IP is rate limited due to too many auth failures
-// Uses fixed-window rate limiting to prevent boundary attacks
-async function checkAuthFailureRateLimit(env: Env, ip: string): Promise<boolean> {
-  const window = getFailedAuthWindow(env);
-  const limit = getFailedAuthLimit(env);
-  const key = `auth_fail:${ip}`;
-  const data = await env.CACHE.get(key);
-  
-  if (!data) return false;
-  
-  try {
-    const parsed: RateLimitData = JSON.parse(data);
-    const now = Math.floor(Date.now() / 1000);
-    
-    // If window has expired, not rate limited
-    if (now - parsed.firstFailure > window) {
-      return false;
-    }
-    
-    // Check if count exceeds limit
-    return parsed.count >= limit;
-  } catch {
-    return false;
-  }
-}
-
-// Helper: Increment auth failure counter for IP
-// Uses fixed-window rate limiting - tracks first failure timestamp
-//
-// IMPORTANT: Cloudflare KV Limitation
-// ------------------------------------
-// KV requires a minimum TTL of 60 seconds. We considered using a calculated
-// `remainingTtl = window - elapsed_time` to prevent window extension, but this
-// fails when elapsed_time > 0 because remainingTtl would be < 60 seconds.
-//
-// Trade-off: We use the full `window` TTL for each update, which means the
-// rate limit window CAN extend if an attacker spaces requests. For example:
-// - Failure at time 0s → expires at 60s
-// - Failure at time 30s → expires at 90s (extended by 30s)
-//
-// This is acceptable because:
-// 1. Most brute-force attacks are rapid-fire, not strategically spaced
-// 2. Working rate limiting > perfect rate limiting
-// 3. The extension is limited to `window` seconds maximum per request
-async function trackAuthFailure(env: Env, ip: string): Promise<void> {
-  const window = getFailedAuthWindow(env);
-  const key = `auth_fail:${ip}`;
-  const existing = await env.CACHE.get(key);
-  const now = Math.floor(Date.now() / 1000);
-  
-  if (existing) {
-    try {
-      const data: RateLimitData = JSON.parse(existing);
-      
-      // If still within same window, increment count
-      if (now - data.firstFailure < window) {
-        // Use full window TTL - see comment above about KV 60s minimum TTL limitation
-        await env.CACHE.put(key, JSON.stringify({
-          firstFailure: data.firstFailure,
-          count: data.count + 1
-        }), { expirationTtl: window });
-        return;
-      }
-    } catch {
-      // Invalid data, start fresh
-    }
-  }
-  
-  // Start new window
-  await env.CACHE.put(key, JSON.stringify({
-    firstFailure: now,
-    count: 1
-  }), { expirationTtl: window });
-}
 
 // Helper: Get client IP from request
 function getClientIp(c: Context<{ Bindings: Env; Variables: Variables }>): string | null {
@@ -128,11 +35,6 @@ export async function authMiddleware(c: Context<{ Bindings: Env; Variables: Vari
     throw new HTTPException(403, { message: 'Unable to identify client' });
   }
   
-  // Check if IP is blocked due to too many failed auth attempts
-  if (await checkAuthFailureRateLimit(c.env, ip)) {
-    throw new HTTPException(429, { message: 'Too many failed authentication attempts. Please try again later.' });
-  }
-
   // Get session token from request
   const token = getSessionTokenFromRequest(c.req.raw);
   
@@ -155,7 +57,6 @@ export async function authMiddleware(c: Context<{ Bindings: Env; Variables: Vari
   const user = await getUserById(c.env, session.user_id);
   
   if (!user) {
-    await trackAuthFailure(c.env, ip);
     throw new HTTPException(401, { message: 'User not found' });
   }
 
@@ -329,8 +230,8 @@ export async function apiKeyMiddleware(c: Context<{ Bindings: Env; Variables: Va
     throw new HTTPException(403, { message: 'Unable to identify client' });
   }
   
-  // Check if IP is blocked due to too many failed auth attempts
-  if (await checkAuthFailureRateLimit(c.env, ip)) {
+  const { success: rateLimitAllowed } = await c.env.API_AUTH_RATE_LIMITER.limit({ key: `api-auth:${ip}` });
+  if (!rateLimitAllowed) {
     throw new HTTPException(429, { message: 'Too many failed authentication attempts. Please try again later.' });
   }
 
@@ -338,7 +239,6 @@ export async function apiKeyMiddleware(c: Context<{ Bindings: Env; Variables: Va
   const authHeader = c.req.header('Authorization');
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    await trackAuthFailure(c.env, ip);
     throw new HTTPException(401, { message: 'API key required' });
   }
   
@@ -346,7 +246,6 @@ export async function apiKeyMiddleware(c: Context<{ Bindings: Env; Variables: Va
   
   // Extract prefix (first 16 chars: "sk_live_ab12cd34")
   if (providedKey.length < 16) {
-    await trackAuthFailure(c.env, ip);
     throw new HTTPException(401, { message: 'Invalid API key format' });
   }
   
@@ -355,10 +254,9 @@ export async function apiKeyMiddleware(c: Context<{ Bindings: Env; Variables: Va
   // Query API keys with matching prefix (much more efficient than checking all keys)
   const allApiKeys = await c.env.DB.prepare(
     `SELECT * FROM api_keys WHERE key_prefix = ? AND status = 'active'`
-  ).bind(keyPrefix).all<{ id: string; key_hash: string; user_id: string; allow_all_ips: number; ip_whitelist: string | null; expires_at: number | null; domain_ids?: string[] }>();
+  ).bind(keyPrefix).all<{ id: string; key_hash: string; user_id: string; allow_all_ips: number; ip_whitelist: string | null; expires_at: number | null; scopes: string; domain_ids?: string[] }>();
   
   if (!allApiKeys.results || allApiKeys.results.length === 0) {
-    await trackAuthFailure(c.env, ip);
     throw new HTTPException(401, { message: 'Invalid API key' });
   }
   
@@ -373,7 +271,6 @@ export async function apiKeyMiddleware(c: Context<{ Bindings: Env; Variables: Va
   }
   
   if (!verifiedKey) {
-    await trackAuthFailure(c.env, ip);
     throw new HTTPException(401, { message: 'Invalid API key' });
   }
   
@@ -439,6 +336,7 @@ export async function apiKeyMiddleware(c: Context<{ Bindings: Env; Variables: Va
     domain_ids: domainIds,
     allow_all_ips: verifiedKey.allow_all_ips === 1,
     ip_whitelist: verifiedKey.ip_whitelist ? JSON.parse(verifiedKey.ip_whitelist) as string[] : undefined,
+    scopes: parseApiKeyScopes(verifiedKey.scopes),
   };
   
   c.set('apiKey', apiKeyContext);
@@ -485,4 +383,3 @@ export async function authOrApiKeyMiddleware(c: Context<{ Bindings: Env; Variabl
   // Fall back to API key auth
   await apiKeyMiddleware(c, next);
 }
-
