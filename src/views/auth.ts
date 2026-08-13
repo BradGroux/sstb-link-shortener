@@ -8,7 +8,7 @@
 import { html, raw } from '../utils/html';
 import { LOGO_DATA_URI } from '../utils/logo';
 
-export const loginHtml = (csrfToken: string, nonce: string) => html`<!DOCTYPE html>
+export const loginHtml = (csrfToken: string, nonce: string, setupAvailable: boolean) => html`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -61,9 +61,9 @@ export const loginHtml = (csrfToken: string, nonce: string) => html`<!DOCTYPE ht
       <div id="error-message" class="error" style="display: none;"></div>
       <button type="submit" class="btn" id="login-btn">Login</button>
     </form>
-    <div class="register-link">
+    ${raw(setupAvailable ? `<div class="register-link">
       <a href="/dashboard/setup">First time? Setup Account</a>
-    </div>
+    </div>` : '')}
   </div>
   <script nonce="${raw(nonce)}">
     // DEBUG: console.log('Login script loaded, nonce applied');
